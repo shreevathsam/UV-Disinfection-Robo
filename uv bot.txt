@@ -1,0 +1,148 @@
+import RPi.GPIO as GPIO
+import tkinter as tk
+from tkinter import messagebox
+import time
+
+# Set up GPIO pins
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(17, GPIO.OUT)  # IN1
+GPIO.setup(18, GPIO.OUT)  # IN2
+GPIO.setup(22, GPIO.OUT)  # IN3
+GPIO.setup(23, GPIO.OUT)  # IN4
+
+# Ultrasonic sensor setup
+TRIG = 25
+ECHO = 24
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)
+
+# PIR sensor setup
+PIR_PIN = 4  # Change this to the GPIO pin to which your PIR sensor is connected
+GPIO.setup(PIR_PIN, GPIO.IN)
+
+# Motor control functions
+def forward():
+    GPIO.output(17, GPIO.HIGH)
+    GPIO.output(18, GPIO.LOW)
+    GPIO.output(22, GPIO.HIGH)
+    GPIO.output(23, GPIO.LOW)
+
+def backward():
+    GPIO.output(17, GPIO.LOW)
+    GPIO.output(18, GPIO.HIGH)
+    GPIO.output(22, GPIO.LOW)
+    GPIO.output(23, GPIO.HIGH)
+
+def left():
+    GPIO.output(17, GPIO.LOW)
+    GPIO.output(18, GPIO.LOW)
+    GPIO.output(22, GPIO.HIGH)
+    GPIO.output(23, GPIO.LOW)
+
+def right():
+    GPIO.output(17, GPIO.HIGH)
+    GPIO.output(18, GPIO.LOW)
+    GPIO.output(22, GPIO.LOW)
+    GPIO.output(23, GPIO.LOW)
+
+def stop():
+    GPIO.output(17, GPIO.LOW)
+    GPIO.output(18, GPIO.LOW)
+    GPIO.output(22, GPIO.LOW)
+    GPIO.output(23, GPIO.LOW)
+
+# Function to read distance from ultrasonic sensor
+def get_distance():
+    GPIO.output(TRIG, True)
+    time.sleep(0.00001)
+    GPIO.output(TRIG, False)
+
+    while GPIO.input(ECHO) == 0:
+        pulse_start = time.time()
+
+    while GPIO.input(ECHO) == 1:
+        pulse_end = time.time()
+
+    pulse_duration = pulse_end - pulse_start
+    distance = pulse_duration * 17150
+    distance = round(distance, 2)
+
+    return distance
+
+# Create GUI window
+root = tk.Tk()
+root.title("Robot Control")
+root.configure(bg='black')
+
+# Function to activate button on cursor hover
+def activate_button(btn, direction_function):
+    btn.configure(bg='red')
+    direction_function()
+
+# Function to deactivate button when cursor moves away
+def deactivate_button(btn):
+    btn.configure(bg='white')
+    stop()
+
+# Create buttons with custom colors
+btn_forward = tk.Button(root, text="Forward", width=15, height=5, bg='white')
+btn_backward = tk.Button(root, text="Backward", width=15, height=5, bg='white')
+btn_left = tk.Button(root, text="Left", width=15, height=5, bg='white')
+btn_right = tk.Button(root, text="Right", width=15, height=5, bg='white')
+
+# Create label for displaying distance
+distance_label = tk.Label(root, text="", bg='black', fg='white')
+
+# Organize buttons and distance label in a grid
+btn_forward.grid(row=0, column=1)
+btn_backward.grid(row=2, column=1)
+btn_left.grid(row=1, column=0)
+btn_right.grid(row=1, column=2)
+distance_label.grid(row=3, column=1)
+
+# Bind button press and release events
+btn_forward.bind("<ButtonPress-1>", lambda event: activate_button(btn_forward, forward))
+btn_backward.bind("<ButtonPress-1>", lambda event: activate_button(btn_backward, backward))
+btn_left.bind("<ButtonPress-1>", lambda event: activate_button(btn_left, left))
+btn_right.bind("<ButtonPress-1>", lambda event: activate_button(btn_right, right))
+
+btn_forward.bind("<ButtonRelease-1>", lambda event: deactivate_button(btn_forward))
+btn_backward.bind("<ButtonRelease-1>", lambda event: deactivate_button(btn_backward))
+btn_left.bind("<ButtonRelease-1>", lambda event: deactivate_button(btn_left))
+btn_right.bind("<ButtonRelease-1>", lambda event: deactivate_button(btn_right))
+
+# Bind button activation and deactivation to cursor proximity
+btn_forward.bind("<Enter>", lambda event: activate_button(btn_forward, forward))
+btn_forward.bind("<Leave>", lambda event: deactivate_button(btn_forward))
+
+btn_backward.bind("<Enter>", lambda event: activate_button(btn_backward, backward))
+btn_backward.bind("<Leave>", lambda event: deactivate_button(btn_backward))
+
+btn_left.bind("<Enter>", lambda event: activate_button(btn_left, left))
+btn_left.bind("<Leave>", lambda event: deactivate_button(btn_left))
+
+btn_right.bind("<Enter>", lambda event: activate_button(btn_right, right))
+btn_right.bind("<Leave>", lambda event: deactivate_button(btn_right))
+
+# Function to update distance label and check for motion
+def update_distance_label():
+    distance = get_distance()
+    distance_label.config(text=f"Distance: {distance} cm")
+
+    if distance < 15:
+        messagebox.showwarning("Warning", "Obstacle too close!")
+
+    # Check for motion using PIR sensor
+    if GPIO.input(PIR_PIN):
+        messagebox.showinfo("Motion Detected", "Motion detected in front of the robot!")
+
+    root.after(100, update_distance_label)  # Update every 100 milliseconds
+
+# Start updating distance label
+update_distance_label()
+
+# Run the GUI
+root.mainloop()
+
+# Clean up and exit
+GPIO.cleanup()
